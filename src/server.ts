@@ -1,4 +1,8 @@
 import {
+  ORSIN_MAINTENANCE_PATH,
+  pilotPathAllowed,
+} from "./server/selfhost/policy";
+import {
   createStartHandler,
   defaultStreamHandler,
 } from "@tanstack/react-start/server";
@@ -143,6 +147,12 @@ function handleFetch(
   const authMode = getAuthMode(env.AUTH_MODE);
   const publicRequest = requestWithPublicOrigin(request);
   const pathname = new URL(publicRequest.url).pathname;
+  if (!isHostedAuthMode(authMode) && !pilotPathAllowed(pathname)) {
+    return new Response(
+      "The self-host pilot exposes only MCP and health. Browser features are disabled.",
+      { status: 403 },
+    );
+  }
   ctx.waitUntil(maybeSendSelfHostHeartbeat(pathname));
 
   if (pathname === "/api/ai-visibility/download") {
@@ -182,6 +192,15 @@ function handleFetch(
     );
   }
 
+  // Operator-only ledger recovery for the self-host pilot. Hosted mode has
+  // already returned above, so this never serves openseo.so.
+  if (pathname === ORSIN_MAINTENANCE_PATH) {
+    return import("@/server/selfhost/maintenance").then(
+      ({ handleOrsinMaintenanceRequest }) =>
+        handleOrsinMaintenanceRequest(publicRequest, authMode, env),
+    );
+  }
+
   return appFetch(request);
 }
 
@@ -190,6 +209,8 @@ function handleFetch(
 // (src/audit-worker.ts); this worker reaches them via cross-script bindings.
 export { RankCheckWorkflow } from "./server/workflows/RankCheckWorkflow";
 export { AiVisibilityWorkflow } from "./server/workflows/AiVisibilityWorkflow";
+// Durable account budget and client routing for the self-host research pilot.
+export { SelfHostControl } from "./server/selfhost/SelfHostControl";
 // Durable Object class for the SAM in-app agent (Agents SDK).
 export { SamChatAgent } from "./server/features/sam/SamChatAgent";
 
@@ -203,6 +224,7 @@ export default {
     env: Env,
     _ctx: ExecutionContext,
   ) {
+    if (!isHostedAuthMode(getAuthMode(env.AUTH_MODE))) return;
     if (controller.cron === MCP_OAUTH_PURGE_CRON) {
       // Only hosted mode runs the OAuth provider (and has OAUTH_KV bound).
       if (isHostedAuthMode(getAuthMode(env.AUTH_MODE))) {

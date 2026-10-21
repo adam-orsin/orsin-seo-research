@@ -116,14 +116,28 @@ export async function fetchLiveSerp(input: {
   // DataForSEO uses a task error for a valid empty SERP. Keep the charged
   // response in the normal billing path and return an empty item list.
   const task = assertOk(response, { treatNoResultsAsEmpty: true });
-  return {
-    data: parseTaskItems(
-      "google-organic-live-advanced",
-      task,
-      serpSnapshotItemSchema,
-    ),
-    billing: buildTaskBilling(task),
-  };
+  const billing = buildTaskBilling(task);
+  try {
+    return {
+      data: parseTaskItems(
+        "google-organic-live-advanced",
+        task,
+        serpSnapshotItemSchema,
+      ),
+      billing,
+    };
+  } catch (error) {
+    // A malformed result does not erase a definitive provider charge.
+    // Both billing modes must settle it, including any self-host overrun.
+    if (error instanceof AppError)
+      throw new DataforseoChargedTaskError(
+        error.message,
+        billing,
+        false,
+        error.code,
+      );
+    throw error;
+  }
 }
 
 export interface RankCheckResult {

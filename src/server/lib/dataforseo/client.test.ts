@@ -183,14 +183,15 @@ function mockDataforseoResult(costUsd: number) {
 }
 
 describe("meterDataforseoCall", () => {
-  it("skips billing in non-hosted mode", async () => {
+  it("refuses unsupported self-host calls before the provider", async () => {
     isHostedServerAuthModeMock.mockResolvedValue(false);
     mockDataforseoResult(RAW_COST);
 
     const client = createDataforseoClient(billingCustomer);
-    const result = await client.backlinks.summary(backlinksInput);
-
-    expect(result).toEqual({ rank: 42 });
+    await expect(
+      client.backlinks.summary(backlinksInput),
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(fetchBacklinksSummary).not.toHaveBeenCalled();
     expect(checkMock).not.toHaveBeenCalled();
     expect(finalizeMock).not.toHaveBeenCalled();
   });

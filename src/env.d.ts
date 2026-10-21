@@ -14,7 +14,9 @@ declare namespace Cloudflare {
     OAUTH_KV: KVNamespace;
 
     // Durable Object backing the SAM in-app agent (see wrangler.jsonc).
-    SAM_CHAT: DurableObjectNamespace;
+    // Inline import keeps this file ambient and matches the generated binding.
+    // oxlint-disable-next-line typescript-eslint/consistent-type-imports
+    SAM_CHAT: DurableObjectNamespace<import("./server").SamChatAgent>;
 
     // Durable Object holding per-audit crawl scratch state (frontier, link
     // edges, page mirror). Bound ONLY in the open-seo-audit aux worker;
@@ -63,6 +65,9 @@ declare namespace Cloudflare {
     META_CONVERSIONS_API_TOKEN?: string;
     // HMAC secret for the operator-only GDPR storage-erasure endpoint.
     GDPR_ERASURE_SECRET?: string;
+    // Shared secret for the self-host pilot's operator-only ledger recovery
+    // route (/api/orsin/maintenance). Unset disables the route.
+    ORSIN_MAINTENANCE_SECRET?: string;
 
     // Cloudflare Turnstile — signup captcha (hosted only). Secret verifies
     // tokens server-side; site key is public and inlined into the client build.
