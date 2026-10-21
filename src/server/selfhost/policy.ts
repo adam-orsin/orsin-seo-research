@@ -63,10 +63,13 @@ export const directorySchema = z
   });
 
 // Integer microdollars avoid rounding a tiny paid request down to zero.
+// Drop binary float noise before the ceiling: an estimate computed as
+// 0.012 + 162 * 0.00012 and a provider bill parsed from "0.03144" must both
+// land on 31440, or a one-micro phantom overrun pauses the deployment.
 export function usdToMicros(usd: number): number {
   if (!Number.isFinite(usd) || usd < 0 || usd > 1_000_000)
     throw new Error("Invalid provider cost.");
-  return Math.ceil(usd * 1_000_000);
+  return Math.ceil(Number((usd * 1_000_000).toFixed(3)));
 }
 
 function limit(value: unknown): number {

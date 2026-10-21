@@ -139,6 +139,17 @@ describe("self-host spending and client routing", () => {
     });
     expect(() => ledger.reserve(reservation(1))).toThrow("budget");
   });
+  it("does not treat float noise between an estimate and the provider bill as an overrun", () => {
+    const { id } = ledger.reserve(
+      reservation(usdToMicros(0.012 + 162 * 0.00012)),
+    );
+    // The literal is what JSON.parse yields from a provider "cost": 0.03144.
+    ledger.settle({ id, actual: usdToMicros(0.03144) });
+    expect(ledger.status()).toMatchObject({
+      paused: false,
+      dailySpent: 31_440,
+    });
+  });
   it("matches exact client references, domains, and organization scope", () => {
     expect(ledger.bind(mapping)).toMatchObject({ domain: "example.com" });
     expect(ledger.resolve("org", "demo-client").projectId).toBe("project");
