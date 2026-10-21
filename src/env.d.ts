@@ -14,6 +14,8 @@ declare namespace Cloudflare {
     OAUTH_KV: KVNamespace;
 
     // Durable Object backing the SAM in-app agent (see wrangler.jsonc).
+    // Inline import keeps this file ambient and matches the generated binding.
+    // oxlint-disable-next-line typescript-eslint/consistent-type-imports
     SAM_CHAT: DurableObjectNamespace<import("./server").SamChatAgent>;
 
     // Durable Object holding per-audit crawl scratch state (frontier, link
