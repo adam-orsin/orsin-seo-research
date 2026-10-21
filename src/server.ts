@@ -1,4 +1,7 @@
-import { pilotPathAllowed } from "./server/selfhost/policy";
+import {
+  ORSIN_MAINTENANCE_PATH,
+  pilotPathAllowed,
+} from "./server/selfhost/policy";
 import {
   createStartHandler,
   defaultStreamHandler,
@@ -186,6 +189,15 @@ function handleFetch(
     return import("@/server/mcp/transport").then(
       ({ handleSelfHostedOpenSeoMcpRequest }) =>
         handleSelfHostedOpenSeoMcpRequest(publicRequest, authMode, env, ctx),
+    );
+  }
+
+  // Operator-only ledger recovery for the self-host pilot. Hosted mode has
+  // already returned above, so this never serves openseo.so.
+  if (pathname === ORSIN_MAINTENANCE_PATH) {
+    return import("@/server/selfhost/maintenance").then(
+      ({ handleOrsinMaintenanceRequest }) =>
+        handleOrsinMaintenanceRequest(publicRequest, authMode, env),
     );
   }
 

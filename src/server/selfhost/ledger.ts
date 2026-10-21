@@ -37,6 +37,8 @@ const settlementSchema = z
     actual: z.number().int().nonnegative().max(1e12),
   })
   .strict();
+const reasonSchema = z.string().trim().min(1).max(1000);
+const actorSchema = z.string().trim().min(1).max(200);
 
 // One ledger per deployment/provider account. Client mappings and holds are
 // normalized SQL rows; no application data is moved out of D1/Postgres.
@@ -59,6 +61,12 @@ export class ResearchLedger {
       `CREATE TABLE IF NOT EXISTS spend_state (id INTEGER PRIMARY KEY CHECK (id = 1), paused INTEGER NOT NULL)`,
     );
     store.query(`INSERT OR IGNORE INTO spend_state(id, paused) VALUES (1, 0)`);
+    // Operator interventions only. Agents never write here (see the pilot
+    // doc): every row names who released a hold or unpaused research and why.
+    store.query(`CREATE TABLE IF NOT EXISTS ledger_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT NOT NULL CHECK (kind IN ('release', 'unpause')),
+      reservation_id TEXT REFERENCES spend_reservations(id), actor TEXT NOT NULL,
+      reason TEXT NOT NULL, created_at TEXT NOT NULL)`);
   }
 
   bind(input: unknown) {
@@ -199,6 +207,62 @@ export class ResearchLedger {
     });
   }
 
+  listUnsettled() {
+    return this.store
+      .query(
+        `SELECT id, organization_id, project_id, client_ref, operation, estimated, created_at
+        FROM spend_reservations WHERE actual IS NULL ORDER BY created_at, id`,
+      )
+      .map((row) => ({
+        id: String(row.id),
+        organizationId: String(row.organization_id),
+        projectId: String(row.project_id),
+        clientRef: String(row.client_ref),
+        operation: String(row.operation),
+        estimated: Number(row.estimated),
+        createdAt: String(row.created_at),
+      }));
+  }
+
+  // Operator path for a hold whose outcome stayed unknown (timeout, failed
+  // settlement). The hold settles at zero so it stops counting against the
+  // period limits; the provider's real bill, if any, is reconciled by hand.
+  release(id: string, reason: string, actor: string) {
+    const value = {
+      id: z.string().uuid().parse(id),
+      reason: reasonSchema.parse(reason),
+      actor: actorSchema.parse(actor),
+    };
+    return this.store.transaction(() => {
+      const row = this.store.query(
+        "SELECT actual FROM spend_reservations WHERE id = ?",
+        value.id,
+      )[0];
+      if (!row) throw new Error("Unknown reservation.");
+      if (row.actual !== null)
+        throw new Error("Reservation is already settled; nothing to release.");
+      this.store.query(
+        "UPDATE spend_reservations SET actual = 0 WHERE id = ? AND actual IS NULL",
+        value.id,
+      );
+      this.recordEvent("release", value.id, value.actor, value.reason);
+      return { id: value.id };
+    });
+  }
+
+  unpause(reason: string, actor: string) {
+    const value = {
+      reason: reasonSchema.parse(reason),
+      actor: actorSchema.parse(actor),
+    };
+    return this.store.transaction(() => {
+      if (!this.status().paused) throw new Error("Research is not paused.");
+      this.store.query("UPDATE spend_state SET paused = 0 WHERE id = 1");
+      this.recordEvent("unpause", null, value.actor, value.reason);
+      return { paused: false };
+    });
+  }
+
   status() {
     const now = new Date().toISOString();
     const row = this.store.query(
@@ -227,6 +291,22 @@ export class ResearchLedger {
       },
       operations: this.policy.operations,
     };
+  }
+
+  private recordEvent(
+    kind: "release" | "unpause",
+    reservationId: string | null,
+    actor: string,
+    reason: string,
+  ) {
+    this.store.query(
+      `INSERT INTO ledger_events (kind, reservation_id, actor, reason, created_at) VALUES (?, ?, ?, ?, ?)`,
+      kind,
+      reservationId,
+      actor,
+      reason,
+      new Date().toISOString(),
+    );
   }
 
   private requireDirectory(clientRef: string, domain: string) {

@@ -36,9 +36,13 @@ function getValidatedTeamDomain(teamDomain: string) {
   return result.origin;
 }
 
-export async function resolveCloudflareAccessContext(
+// Verifies the Access JWT Cloudflare attached in front of the worker and
+// returns its claims. A user login carries sub + email; a service token
+// carries common_name and an empty sub, which is why the operator maintenance
+// route reads the payload itself instead of resolving a workspace user.
+export async function verifyCloudflareAccessToken(
   headers: Headers,
-): Promise<EnsuredUserContext> {
+): Promise<JWTPayload> {
   const teamDomain = env.TEAM_DOMAIN
     ? getValidatedTeamDomain(env.TEAM_DOMAIN)
     : null;
@@ -72,13 +76,13 @@ export async function resolveCloudflareAccessContext(
   // Only the token verification itself is classified — anything thrown past
   // this block (user resolution, DB access) is an app fault, and classifying
   // it here would mislabel a DB outage as an auth-config problem.
-  let payload: JWTPayload;
   try {
     const jwks = getJwks(teamDomain);
-    ({ payload } = await jwtVerify(token, jwks, {
+    const { payload } = await jwtVerify(token, jwks, {
       issuer: teamDomain,
       audience: policyAud,
-    }));
+    });
+    return payload;
   } catch (error) {
     // The classified AppError carries operator guidance; log the raw jose
     // error too, since it is the only place the underlying cause survives.
@@ -86,6 +90,12 @@ export async function resolveCloudflareAccessContext(
 
     throw classifyAccessVerificationError(error);
   }
+}
+
+export async function resolveCloudflareAccessContext(
+  headers: Headers,
+): Promise<EnsuredUserContext> {
+  const payload = await verifyCloudflareAccessToken(headers);
 
   const userId = typeof payload.sub === "string" ? payload.sub : null;
   const userEmail = typeof payload.email === "string" ? payload.email : null;

@@ -46,7 +46,12 @@ beforeAll(async () => {
       const {action,input}=await request.json();
       const actor=env.ORSIN_CONTROL.getByName('dataforseo-account');
       try {
-        const result=action==='bind' ? await actor.bind(input) : action==='reserve' ? await actor.reserve(input) : action==='settle' ? await actor.settle(input) : await actor.status();
+        const result=action==='bind' ? await actor.bind(input)
+          : action==='reserve' ? await actor.reserve(input)
+          : action==='settle' ? await actor.settle(input)
+          : action==='listUnsettled' ? await actor.listUnsettled()
+          : action==='release' ? await actor.release(input.id, input.reason, input.actor)
+          : await actor.status();
         return Response.json(result??{});
       } catch {return new Response('refused',{status:409});}
     }};
@@ -107,6 +112,39 @@ it("serializes concurrent RPC reservations and persists budget state across Work
   expect(
     (await rpc("settle", { id: reservation.id, actual: 8_000 })).status,
   ).toBe(200);
+  expect(await (await rpc("status")).json()).toMatchObject({
+    held: 0,
+    dailySpent: 8_000,
+  });
+}, 30_000);
+it("releases a retained hold over RPC so the next reservation fits the budget", async () => {
+  const stuck = z.object({ id: z.string() }).parse(
+    await (
+      await rpc("reserve", {
+        id: crypto.randomUUID(),
+        organizationId: "org",
+        projectId: "project",
+        domain: "example.com",
+        operation: "maps.grid",
+        estimated: 7_000,
+      })
+    ).json(),
+  );
+  expect(await (await rpc("listUnsettled")).json()).toMatchObject([
+    { id: stuck.id, estimated: 7_000 },
+  ]);
+  expect(
+    (
+      await rpc("release", {
+        id: stuck.id,
+        reason: "Timed out; provider shows no task",
+        actor: "ops",
+      })
+    ).status,
+  ).toBe(200);
+  expect(
+    (await rpc("release", { id: stuck.id, reason: "x", actor: "ops" })).status,
+  ).toBe(409);
   expect(await (await rpc("status")).json()).toMatchObject({
     held: 0,
     dailySpent: 8_000,

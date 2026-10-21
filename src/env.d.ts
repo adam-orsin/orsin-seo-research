@@ -65,6 +65,9 @@ declare namespace Cloudflare {
     META_CONVERSIONS_API_TOKEN?: string;
     // HMAC secret for the operator-only GDPR storage-erasure endpoint.
     GDPR_ERASURE_SECRET?: string;
+    // Shared secret for the self-host pilot's operator-only ledger recovery
+    // route (/api/orsin/maintenance). Unset disables the route.
+    ORSIN_MAINTENANCE_SECRET?: string;
 
     // Cloudflare Turnstile — signup captcha (hosted only). Secret verifies
     // tokens server-side; site key is public and inlined into the client build.

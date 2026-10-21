@@ -33,4 +33,15 @@ export class SelfHostControl extends DurableObject<Env> {
   status() {
     return this.ledger.status();
   }
+  // Operator maintenance only; reached through /api/orsin/maintenance, never
+  // through an MCP tool.
+  listUnsettled() {
+    return this.ledger.listUnsettled();
+  }
+  release(id: string, reason: string, actor: string) {
+    return this.ledger.release(id, reason, actor);
+  }
+  unpause(reason: string, actor: string) {
+    return this.ledger.unpause(reason, actor);
+  }
 }

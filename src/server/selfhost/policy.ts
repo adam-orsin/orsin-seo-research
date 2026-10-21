@@ -122,8 +122,34 @@ export const PILOT_TOOLS = new Set([
   "estimate_research_cost",
 ]);
 
+// One Durable Object instance coordinates the deployment's provider account.
+export const SELF_HOST_CONTROL_NAME = "dataforseo-account";
+
+// Operator-only ledger recovery (list stuck holds, release one, unpause).
+// Gated by Cloudflare Access plus ORSIN_MAINTENANCE_SECRET in this header.
+export const ORSIN_MAINTENANCE_PATH = "/api/orsin/maintenance";
+export const ORSIN_MAINTENANCE_SECRET_HEADER = "x-orsin-maintenance-secret";
+export const maintenanceRequestSchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("list") }).strict(),
+  z
+    .object({
+      action: z.literal("release"),
+      id: z.string().uuid(),
+      reason: z.string().trim().min(1).max(1000),
+    })
+    .strict(),
+  z
+    .object({
+      action: z.literal("unpause"),
+      reason: z.string().trim().min(1).max(1000),
+    })
+    .strict(),
+]);
+
 // Cloudflare Access handles login before the worker. The pilot has no browser
 // app, in-app agent, server-function API, crawler, or public report surface.
 export function pilotPathAllowed(path: string) {
-  return path === "/mcp" || path === "/api/health";
+  return (
+    path === "/mcp" || path === "/api/health" || path === ORSIN_MAINTENANCE_PATH
+  );
 }

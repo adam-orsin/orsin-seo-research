@@ -51,6 +51,7 @@
     "billing:usage": "tsx scripts/dataforseo-account-usage.ts",
     "cleanup:default-projects:d1": "tsx scripts/d1-default-project-cleanup.ts",
     "gdpr:erase-user": "tsx scripts/erase-user-data.ts",
+    "orsin:ledger": "tsx scripts/orsin-ledger-maintenance.ts",
     "repair:rank-locations": "tsx scripts/repair-rank-tracking-locations.ts",
     "seed:rank-tracking": "tsx scripts/seed-rank-tracking.ts",
     "seed:projects": "tsx scripts/seed-projects.ts",

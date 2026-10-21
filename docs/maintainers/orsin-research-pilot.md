@@ -4,7 +4,7 @@ This fork provides a separate MCP research service. Deployment is not approved. 
 
 ## First increment
 
-Self-host mode exposes `/mcp` and `/api/health`. Browser pages, server functions, in-app agents, public reports, site audits, and scheduled execution are blocked. MCP tools outside the pilot allowlist refuse invocation. Hosted upstream behavior keeps its existing billing path.
+Self-host mode exposes `/mcp`, `/api/health`, and the operator-only `/api/orsin/maintenance`. Browser pages, server functions, in-app agents, public reports, site audits, and scheduled execution are blocked. MCP tools outside the pilot allowlist refuse invocation. Hosted upstream behavior keeps its existing billing path.
 
 The pilot supports four paid provider operations: `keywords.overview`, `serp.organic`, `maps.grid`, and `business.profile`. Each operation is disabled until it appears in `ORSIN_ENABLED_OPERATIONS`. Keyword metrics that require the Google Ads fallback are unavailable in this increment. Maps targets require an exact `cid` or `placeId`; omit the name fallback.
 
@@ -19,6 +19,10 @@ One SQLite-backed Durable Object coordinates the deployment's DataForSEO account
 A definitive provider cost settles the reservation. A definitive billed failure also settles its known cost, including a billed SERP payload that fails result validation. The HTTP transport never retries self-host POST requests after a server error; free GET collection retains its retry policy. A timeout, invalid cost metadata, or interrupted settlement retains the reservation. Unknown outcomes never cause an automatic refund or automatic paid retry. Retrying a settled reservation is idempotent only when the cost matches. A repeated reservation ID refuses dispatch.
 
 Estimates are not a provider-side spending guarantee. If a real bill exceeds its estimate, the ledger records the full cost and pauses subsequent research. Investigate pricing and reconcile unknown outcomes against provider evidence before operator maintenance. This increment deliberately has no agent tool to reset budgets, release unknown holds, unpause spending, or overwrite mappings.
+
+Recovery is an operator action outside MCP. `POST /api/orsin/maintenance` requires two things: the Cloudflare Access identity in front of the worker (a login admitted by the Access application, or a service token the application's Service Auth policy admits) and the `x-orsin-maintenance-secret` header matching `ORSIN_MAINTENANCE_SECRET`. The secret is compared in constant time. An unset or empty secret disables the route, hosted mode never serves it, and `AUTH_MODE=local_noauth` attributes the action to the local admin. The JSON body is one of `{"action":"list"}`, which returns the spending status and every unsettled reservation; `{"action":"release","id":"<reservation>","reason":"<why>"}`, which settles one unsettled reservation at zero; or `{"action":"unpause","reason":"<why>"}`, which clears the pause. Releasing a settled reservation and unpausing an unpaused ledger both refuse. Each intervention writes a `ledger_events` row with the actor, reason, and UTC timestamp. A release refunds nothing on the provider side and budgets and mappings still change only through a deploy.
+
+Run `pnpm orsin:ledger <origin> list`, `pnpm orsin:ledger <origin> release <id> --reason "<why>"`, or `pnpm orsin:ledger <origin> unpause --reason "<why>"` with `ORSIN_MAINTENANCE_SECRET`, `CF_ACCESS_CLIENT_ID`, and `CF_ACCESS_CLIENT_SECRET` in the environment. The script takes no secret on the command line.
 
 Existing Maps receipt caching still collects previously submitted tasks without another charge when the receipt is available. It is not an exactly-once provider guarantee: a lost receipt or simultaneous identical tool calls can buy duplicate research within the overall budget. Review unknown outcomes before repeating a request.
 
@@ -41,7 +45,7 @@ Run the exporter locally, inspect its output, and put the approved projection in
 
 ## Verification
 
-Unit tests use real SQLite for the ledger, including period boundaries, overrun pauses, mapping conflicts, and concurrent reservations. Service tests verify that refused reservations prevent provider calls and that ambiguous outcomes retain holds. A Miniflare test runs the actual Durable Object over RPC, races reservations, restarts the Worker, and checks persisted settlement. No test requires client credentials or paid provider calls.
+Unit tests use real SQLite for the ledger, including period boundaries, overrun pauses, mapping conflicts, and concurrent reservations. Service tests verify that refused reservations prevent provider calls and that ambiguous outcomes retain holds. A Miniflare test runs the actual Durable Object over RPC, races reservations, restarts the Worker, checks persisted settlement, and releases a retained hold. The maintenance route test covers the hosted refusal, the disabled-until-configured secret, the wrong-secret refusal, and the operator identity recorded with each action. No test requires client credentials or paid provider calls.
 
 The binding file is generated with `cf-typegen`; the upstream runtime declarations remain separate to avoid unrelated runtime-type changes. The existing D1/Postgres product schemas are unchanged.
 

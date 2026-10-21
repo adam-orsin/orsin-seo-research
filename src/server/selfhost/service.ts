@@ -7,7 +7,13 @@ import {
   type DataforseoApiResponse,
 } from "@/server/lib/dataforseo/envelope";
 import type { BillingCustomerContext } from "@/server/billing/subscription";
-import { domainOf, operationSchema, usdToMicros, PILOT_TOOLS } from "./policy";
+import {
+  domainOf,
+  operationSchema,
+  usdToMicros,
+  PILOT_TOOLS,
+  SELF_HOST_CONTROL_NAME,
+} from "./policy";
 import type { ToolContext } from "@/server/mcp/context";
 
 export function selfHostControl() {
@@ -16,7 +22,7 @@ export function selfHostControl() {
       "AUTH_CONFIG_MISSING",
       "Self-host control binding is missing; paid research is disabled.",
     );
-  return env.ORSIN_CONTROL.getByName("dataforseo-account");
+  return env.ORSIN_CONTROL.getByName(SELF_HOST_CONTROL_NAME);
 }
 
 export async function authorizePilotTool(

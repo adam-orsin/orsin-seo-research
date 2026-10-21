@@ -150,6 +150,56 @@ describe("self-host spending and client routing", () => {
       dailySpent: 31_440,
     });
   });
+  it("releases a stuck hold at zero so the budget frees up, and refuses a second release", () => {
+    const stuck = ledger.reserve(reservation());
+    expect(() => ledger.reserve(reservation())).toThrow("budget");
+    expect(ledger.listUnsettled()).toMatchObject([
+      { id: stuck.id, clientRef: "demo-client", estimated: 100_000 },
+    ]);
+    ledger.release(stuck.id, "No charge on the provider dashboard", "ops");
+    expect(ledger.status()).toMatchObject({ held: 0, dailySpent: 0 });
+    expect(ledger.listUnsettled()).toEqual([]);
+    ledger.reserve(reservation());
+    expect(() => ledger.release(stuck.id, "again", "ops")).toThrow(
+      "already settled",
+    );
+    expect(() => ledger.release(crypto.randomUUID(), "x", "ops")).toThrow(
+      "Unknown",
+    );
+    expect(
+      store.query(
+        "SELECT kind, reservation_id, actor, reason FROM ledger_events",
+      ),
+    ).toEqual([
+      {
+        kind: "release",
+        reservation_id: stuck.id,
+        actor: "ops",
+        reason: "No charge on the provider dashboard",
+      },
+    ]);
+  });
+  it("unpauses after an overrun with a recorded reason and refuses when not paused", () => {
+    const { id } = ledger.reserve(reservation(10_000));
+    ledger.settle({ id, actual: 12_000 });
+    expect(() => ledger.reserve(reservation(1))).toThrow("budget");
+    ledger.unpause("Price list corrected", "ops");
+    expect(ledger.status().paused).toBe(false);
+    ledger.reserve(reservation(1));
+    expect(() => ledger.unpause("again", "ops")).toThrow("not paused");
+    expect(
+      store.query(
+        "SELECT kind, reservation_id, actor, reason FROM ledger_events",
+      ),
+    ).toEqual([
+      {
+        kind: "unpause",
+        reservation_id: null,
+        actor: "ops",
+        reason: "Price list corrected",
+      },
+    ]);
+  });
   it("matches exact client references, domains, and organization scope", () => {
     expect(ledger.bind(mapping)).toMatchObject({ domain: "example.com" });
     expect(ledger.resolve("org", "demo-client").projectId).toBe("project");
@@ -201,6 +251,7 @@ describe("self-host spending and client routing", () => {
       }),
     ).toThrow();
     expect(pilotPathAllowed("/mcp")).toBe(true);
+    expect(pilotPathAllowed("/api/orsin/maintenance")).toBe(true);
     for (const path of [
       "/_server/action",
       "/api/ai-visibility/download",
