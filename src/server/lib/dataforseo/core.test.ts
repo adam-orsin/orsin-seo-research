@@ -1,16 +1,54 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/server/lib/runtime-env", () => ({
+  isHostedServerAuthMode: vi.fn(async () => true),
   getRequiredEnvValue: vi.fn(async () => "encoded-credentials"),
 }));
 
-import { dataforseoPost } from "@/server/lib/dataforseo/core";
+import { isHostedServerAuthMode } from "@/server/lib/runtime-env";
+import {
+  dataforseoGet,
+  dataforseoPost,
+  dataforseoPostResponse,
+} from "@/server/lib/dataforseo/core";
+
+beforeEach(() => {
+  vi.mocked(isHostedServerAuthMode).mockResolvedValue(true);
+});
 
 afterEach(() => {
   vi.unstubAllGlobals();
 });
 
 describe("DataForSEO transport", () => {
+  it.each([dataforseoPost, dataforseoPostResponse])(
+    "never retries self-host POSTs after an ambiguous HTTP failure",
+    async (post) => {
+      vi.mocked(isHostedServerAuthMode).mockResolvedValue(false);
+      const provider = vi
+        .fn<typeof fetch>()
+        .mockResolvedValueOnce(new Response("unknown charge", { status: 503 }))
+        .mockResolvedValue(Response.json({ status_code: 20000, tasks: [] }));
+      vi.stubGlobal("fetch", provider);
+      await expect(
+        post("/v3/serp/google/organic/live/advanced", []),
+      ).rejects.toMatchObject({ code: "UPSTREAM_UNAVAILABLE" });
+      expect(provider).toHaveBeenCalledTimes(1);
+    },
+  );
+  it("still retries free self-host GET collection", async () => {
+    vi.mocked(isHostedServerAuthMode).mockResolvedValue(false);
+    const provider = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response("transient", { status: 503 }))
+      .mockResolvedValueOnce(Response.json({ status_code: 20000, tasks: [] }));
+    vi.stubGlobal("fetch", provider);
+    await expect(
+      dataforseoGet("/v3/serp/google/maps/task_get/advanced/task-id"),
+    ).resolves.toMatchObject({ status_code: 20000 });
+    expect(provider).toHaveBeenCalledTimes(2);
+  });
+
   it("retries a transient 5xx on idempotent reads and returns the parsed envelope", async () => {
     const fetchMock = vi
       .fn<typeof fetch>()

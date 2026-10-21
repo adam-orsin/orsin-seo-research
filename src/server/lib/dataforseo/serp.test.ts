@@ -22,6 +22,31 @@ function parseDataforseoRequestBody(init: RequestInit | undefined): unknown {
 }
 
 describe("live SERP", () => {
+  it("preserves a known bill when result validation fails", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>().mockResolvedValue(
+        Response.json({
+          status_code: 20000,
+          tasks: [
+            {
+              status_code: 20000,
+              path: ["v3", "serp", "google", "organic", "live", "advanced"],
+              cost: 0.003,
+              result: [{ items: [42] }],
+            },
+          ],
+        }),
+      ),
+    );
+    const error = await fetchLiveSerp({
+      keyword: "demo",
+      locationCode: 2840,
+      languageCode: "en",
+    }).catch((cause: unknown) => cause);
+    expect(error).toBeInstanceOf(DataforseoChargedTaskError);
+    expect(error).toMatchObject({ billing: { costUsd: 0.003 } });
+  });
   // 40102 is the documented "No Search Results." code (40501 is "Invalid
   // Field."). isNoResultsTask matches on the status message, not the code, so
   // this stays correct whichever code DataForSEO attaches to the message.

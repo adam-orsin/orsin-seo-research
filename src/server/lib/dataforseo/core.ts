@@ -1,5 +1,8 @@
 import { AppError } from "@/server/lib/errors";
-import { getRequiredEnvValue } from "@/server/lib/runtime-env";
+import {
+  getRequiredEnvValue,
+  isHostedServerAuthMode,
+} from "@/server/lib/runtime-env";
 import type { ErrorCode } from "@/shared/error-codes";
 // No runtime cycle: envelope.ts imports only the DataforseoErrorClassifier
 // type from here.
@@ -106,8 +109,14 @@ function createAuthenticatedFetch(
       }
       if (response.ok) return response;
 
-      // Transient upstream 5xx on an idempotent read -> back off and retry.
-      if (response.status >= 500 && attempt < maxServerErrorRetries) {
+      // A self-host POST can already be billed despite its HTTP failure.
+      // Never spend a second time behind the same durable reservation.
+      // Free GET collection and the existing hosted policy retain retries.
+      if (
+        response.status >= 500 &&
+        attempt < maxServerErrorRetries &&
+        (init?.method !== "POST" || (await isHostedServerAuthMode()))
+      ) {
         await new Promise((resolve) =>
           setTimeout(resolve, DATAFORSEO_RETRY_BACKOFF_MS * (attempt + 1)),
         );
