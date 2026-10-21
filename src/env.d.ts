@@ -14,7 +14,7 @@ declare namespace Cloudflare {
     OAUTH_KV: KVNamespace;
 
     // Durable Object backing the SAM in-app agent (see wrangler.jsonc).
-    SAM_CHAT: DurableObjectNamespace;
+    SAM_CHAT: DurableObjectNamespace<import("./server").SamChatAgent>;
 
     // Durable Object holding per-audit crawl scratch state (frontier, link
     // edges, page mirror). Bound ONLY in the open-seo-audit aux worker;

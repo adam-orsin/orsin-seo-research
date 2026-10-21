@@ -51,6 +51,7 @@
   // derive SQLite backing on their own.
   "durable_objects": {
     "bindings": [
+      { "name": "ORSIN_CONTROL", "class_name": "SelfHostControl" },
       {
         "name": "SAM_CHAT",
         "class_name": "SamChatAgent",
@@ -98,6 +99,7 @@
       "tag": "v5",
       "deleted_classes": ["OnboardingChatAgent"],
     },
+    { "tag": "orsin-v1", "new_sqlite_classes": ["SelfHostControl"] },
   ],
   "triggers": {
     // Every 5 min: rank checks + stale-audit reconcile. Daily: OAuth KV GC.

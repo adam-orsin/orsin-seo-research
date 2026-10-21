@@ -1,3 +1,4 @@
+import { spendSelfHosted } from "@/server/selfhost/service";
 import { waitUntil } from "cloudflare:workers";
 import {
   type CreditFeature,
@@ -87,13 +88,15 @@ function meter<I, T>(
   fetcher: (input: I) => Promise<DataforseoApiResponse<T>>,
   estimateRawUsd: (input: I) => number,
   defaultFeature?: CreditFeature,
+  selfhostOperation?: string,
 ): (input: I & { creditFeature?: CreditFeature }) => Promise<T> {
   return (input) =>
     meterDataforseoCall(
       customer,
       () => fetcher(input),
-      creditsForProviderUsd(estimateRawUsd(input)),
+      estimateRawUsd(input),
       input.creditFeature ?? defaultFeature,
+      selfhostOperation,
     );
 }
 
@@ -117,6 +120,7 @@ export function createDataforseoClient(customer: BillingCustomerContext) {
         fetchMyBusinessInfo,
         dataforseoPricing.business.myBusinessInfo,
         "local_seo",
+        "business.profile",
       ),
       // task_post is where DataForSEO charges; collection runs unmetered
       // through fetchBusinessDataTaskResult (see index.ts).
@@ -206,16 +210,20 @@ export function createDataforseoClient(customer: BillingCustomerContext) {
       ),
     },
     serp: {
-      live: meter(customer, fetchLiveSerp, dataforseoPricing.serp.live),
+      live: meter(
+        customer,
+        fetchLiveSerp,
+        dataforseoPricing.serp.live,
+        undefined,
+        "serp.organic",
+      ),
       // A rank check batch shares one credit hold and one settle across its
       // live calls (see meterDataforseoCalls). Resolves per call, in order.
       rankCheckBatch: (inputs: Parameters<typeof fetchRankCheckSerp>[0][]) =>
         meterDataforseoCalls(
           customer,
           inputs.map((input) => () => fetchRankCheckSerp(input)),
-          inputs.map((input) =>
-            creditsForProviderUsd(dataforseoPricing.serp.rankCheck(input)),
-          ),
+          inputs.map((input) => dataforseoPricing.serp.rankCheck(input)),
           "rank_tracking",
         ),
       // Posts up to 100 queued rank check tasks; one metered charge covers the
@@ -240,6 +248,7 @@ export function createDataforseoClient(customer: BillingCustomerContext) {
         postLocalSerpTasks,
         dataforseoPricing.serp.localTaskPost,
         "local_seo",
+        "maps.grid",
       ),
     },
     labs: {
@@ -251,6 +260,7 @@ export function createDataforseoClient(customer: BillingCustomerContext) {
         fetchKeywordOverview,
         dataforseoPricing.labs.keywordOverview,
         "rank_tracking",
+        "keywords.overview",
       ),
       serpCompetitors: meter(
         customer,
@@ -307,11 +317,7 @@ export function createDataforseoClient(customer: BillingCustomerContext) {
         meterDataforseoCalls(
           customer,
           inputs.map((input) => () => fetchAiTrackingLiveAnswer(input)),
-          inputs.map((input) =>
-            creditsForProviderUsd(
-              dataforseoPricing.aiSearch.trackingLive(input),
-            ),
-          ),
+          inputs.map((input) => dataforseoPricing.aiSearch.trackingLive(input)),
           "ai_prompt_responses",
         ),
     },
@@ -333,15 +339,23 @@ export function createDataforseoClient(customer: BillingCustomerContext) {
 async function meterDataforseoCalls<T>(
   customer: BillingCustomerContext,
   executes: Array<() => Promise<DataforseoApiResponse<T>>>,
-  callCredits: number[],
+  estimatedRawUsd: number[],
   creditFeature?: CreditFeature,
+  selfhostOperation?: string,
 ): Promise<PromiseSettledResult<T>[]> {
   if (executes.length === 0) return [];
   const isHostedMode = await isHostedServerAuthMode();
 
   if (!isHostedMode) {
     return Promise.allSettled(
-      executes.map(async (execute) => (await execute()).data),
+      executes.map((execute, index) =>
+        spendSelfHosted(
+          customer,
+          execute,
+          estimatedRawUsd[index],
+          selfhostOperation,
+        ),
+      ),
     );
   }
 
@@ -349,7 +363,7 @@ async function meterDataforseoCalls<T>(
   const { holds, refusedCalls } = await reserveUsageCredits({
     customer,
     customerId: billingCustomer.id,
-    callCredits,
+    callCredits: estimatedRawUsd.map(creditsForProviderUsd),
     creditFeature,
   });
 
@@ -416,14 +430,16 @@ async function meterDataforseoCalls<T>(
 async function meterDataforseoCall<T>(
   customer: BillingCustomerContext,
   execute: () => Promise<DataforseoApiResponse<T>>,
-  estimatedCredits: number,
+  estimatedRawUsd: number,
   creditFeature?: CreditFeature,
+  selfhostOperation?: string,
 ): Promise<T> {
   const [result] = await meterDataforseoCalls(
     customer,
     [execute],
-    [estimatedCredits],
+    [estimatedRawUsd],
     creditFeature,
+    selfhostOperation,
   );
   if (result.status === "rejected") throw result.reason;
   return result.value;

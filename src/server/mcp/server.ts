@@ -1,3 +1,11 @@
+import { authorizePilotTool } from "@/server/selfhost/service";
+import { isHostedServerAuthMode } from "@/server/lib/runtime-env";
+import {
+  bindClientProjectTool,
+  resolveClientProjectTool,
+  getSpendingStatusTool,
+  estimateResearchCostTool,
+} from "@/server/mcp/tools/orsin-controls";
 import {
   getAiVisibilityTrackerTool,
   generateAiVisibilityPromptsTool,
@@ -160,10 +168,14 @@ function registerOpenSeoTool<Input extends ToolSchema>(
     !supportsApps && widgetSource.success && schema instanceof z.ZodObject
       ? schema.omit({ resultId: true })
       : schema;
-  const handler = instrumentMcpToolHandler(
+  const handler = instrumentMcpToolHandler<ToolArgs<Input>>(
     tool.name,
     outputSchema,
-    tool.handler,
+    async (args, context) => {
+      if (!(await isHostedServerAuthMode()))
+        await authorizePilotTool(tool.name, args, context);
+      return tool.handler(args, context);
+    },
   );
   server.registerTool(
     tool.name,
@@ -235,6 +247,10 @@ export function createOpenSeoMcpServer(
     register(showSearchConsolePerformanceTool);
   }
 
+  register(bindClientProjectTool);
+  register(resolveClientProjectTool);
+  register(getSpendingStatusTool);
+  register(estimateResearchCostTool);
   register(whoamiTool);
   register(listProjectsTool);
   register(createProjectTool);
