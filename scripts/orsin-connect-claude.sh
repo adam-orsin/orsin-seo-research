@@ -5,6 +5,9 @@
 set -e
 APP=https://open-seo-selfhost.orsin.workers.dev
 echo "Opening the Cloudflare sign-in page. Enter adam@orsin.io, then the code from your email."
+# cloudflared reuses a cached pass while it is valid, which would keep an old
+# short-lived pass; drop it so the sign-in always issues a fresh one.
+rm -f "$HOME"/.cloudflared/*open-seo-selfhost*
 cloudflared access login "$APP" > /dev/null
 claude mcp remove -s user orsin-research > /dev/null 2>&1 || true
 claude mcp add -s user -t http orsin-research "$APP/mcp" \
