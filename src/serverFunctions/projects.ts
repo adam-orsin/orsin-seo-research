@@ -3,6 +3,7 @@ import { DashboardFirstAuditService } from "@/server/features/dashboard/services
 import { createServerFn } from "@tanstack/react-start";
 import { requireOrgPermission } from "@/server/auth/org-gate";
 import { ProjectService } from "@/server/features/projects/services/ProjectService";
+import { assertPilotDomainUnchanged } from "@/server/selfhost/service";
 import {
   requireAuthenticatedContext,
   requireProjectContext,
@@ -45,6 +46,7 @@ export const updateProject = createServerFn({ method: "POST" })
   .middleware(requireProjectContext)
   .validator(updateProjectSchema)
   .handler(async ({ data, context }) => {
+    await assertPilotDomainUnchanged(context.project.domain, data.domain);
     const project = await ProjectService.updateProject(
       context.organizationId,
       data,

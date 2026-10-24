@@ -17,6 +17,7 @@ import {
   getSignInSearch,
 } from "@/lib/auth-redirect";
 import { getProjectAccess } from "@/serverFunctions/projects";
+import { PilotUnavailableNotice } from "@/client/features/research-pilot/ResearchPilotPages";
 
 export const Route = createFileRoute("/_app/p/$projectId")({
   // Everything under this subtree fetches its data client-side with
@@ -42,8 +43,11 @@ function useProjectAccessRedirect(projectId: string) {
     staleTime: Infinity,
   });
   const error = access.error;
+  // The research pilot refuses a project with no client mapping. Explain that
+  // in place instead of bouncing to another project.
+  const notLinked = getErrorCode(error) === "PROJECT_NOT_LINKED";
   useEffect(() => {
-    if (!error) return;
+    if (!error || notLinked) return;
     if (getErrorCode(error) === "UNAUTHENTICATED") {
       void navigate({
         to: "/sign-in",
@@ -58,13 +62,13 @@ function useProjectAccessRedirect(projectId: string) {
     // would bring the user straight back here.
     if (getLastProjectId() === projectId) clearLastProjectId();
     void navigate({ to: "/", replace: true });
-  }, [error, navigate, projectId]);
-  return access.isSuccess;
+  }, [error, navigate, notLinked, projectId]);
+  return { hasAccess: access.isSuccess, notLinked };
 }
 
 function ProjectLayout() {
   const { projectId } = Route.useParams();
-  const hasAccess = useProjectAccessRedirect(projectId);
+  const { hasAccess, notLinked } = useProjectAccessRedirect(projectId);
 
   // Remember this as the last-visited project for the landing redirect, once
   // the access check confirms it's one of the org's projects.
@@ -83,5 +87,6 @@ function ProjectLayout() {
     setLastProjectId(projectId);
   }, [projectId, hasAccess, isSettingsPage]);
 
+  if (notLinked) return <PilotUnavailableNotice reason="not-linked" />;
   return <Outlet />;
 }

@@ -17,8 +17,10 @@ import { switchOrganization } from "@/serverFunctions/organization";
 import { clearLastProjectId } from "@/client/lib/active-project";
 import {
   connectNavGroup,
+  getPilotNavGroups,
   getProjectNavGroups,
 } from "@/client/navigation/items";
+import { useResearchPilot } from "@/client/lib/research-pilot";
 import { ProjectSwitcher } from "@/client/features/projects/ProjectSwitcher";
 import {
   SamChatListSkeleton,
@@ -127,10 +129,14 @@ export function Sidebar({
   // the sidebar has its full shape from the first paint instead of growing
   // once projects load. The placeholder rows never render these links.
   const navPlaceholder = projectId === null && projectPending;
-  const navGroups =
+  const researchPilot = useResearchPilot();
+  const allNavGroups =
     projectId !== null || navPlaceholder
       ? getProjectNavGroups(projectId ?? "")
       : [connectNavGroup];
+  const navGroups = researchPilot
+    ? getPilotNavGroups(allNavGroups)
+    : allNavGroups;
   const { pathname } = useLocation();
   const { setOpenMobile } = useSidebar();
   // SAM is hidden from navigation: the chat route is only reachable by URL,
@@ -197,12 +203,18 @@ export function Sidebar({
           </nav>
         )}
       </SidebarContent>
-      <AccountFooter ready={ready} />
+      <AccountFooter ready={ready} researchPilot={researchPilot} />
     </UiSidebar>
   );
 }
 
-function AccountFooter({ ready }: { ready: boolean }) {
+function AccountFooter({
+  ready,
+  researchPilot,
+}: {
+  ready: boolean;
+  researchPilot: boolean;
+}) {
   const { data: session } = useSession();
   const { setOpenMobile } = useSidebar();
   const email = session?.user?.email;
@@ -292,17 +304,19 @@ function AccountFooter({ ready }: { ready: boolean }) {
                   <Settings className="size-4" />
                   Settings
                 </DropdownMenuItem>
-                <DropdownMenuItem
-                  render={
-                    <Link
-                      to={BILLING_ROUTE}
-                      onClick={() => setOpenMobile(false)}
-                    />
-                  }
-                >
-                  <CreditCard className="size-4" />
-                  Billing
-                </DropdownMenuItem>
+                {researchPilot ? null : (
+                  <DropdownMenuItem
+                    render={
+                      <Link
+                        to={BILLING_ROUTE}
+                        onClick={() => setOpenMobile(false)}
+                      />
+                    }
+                  >
+                    <CreditCard className="size-4" />
+                    Billing
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuGroup>
                   <DropdownMenuLabel>Theme</DropdownMenuLabel>
                   <div className="px-1 pb-1">

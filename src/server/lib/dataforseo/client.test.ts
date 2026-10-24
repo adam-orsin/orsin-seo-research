@@ -190,7 +190,7 @@ describe("meterDataforseoCall", () => {
     const client = createDataforseoClient(billingCustomer);
     await expect(
       client.backlinks.summary(backlinksInput),
-    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    ).rejects.toMatchObject({ code: "RESEARCH_UNAVAILABLE" });
     expect(fetchBacklinksSummary).not.toHaveBeenCalled();
     expect(checkMock).not.toHaveBeenCalled();
     expect(finalizeMock).not.toHaveBeenCalled();

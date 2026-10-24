@@ -1,4 +1,9 @@
-import { Outlet, createFileRoute, useParams } from "@tanstack/react-router";
+import {
+  Outlet,
+  createFileRoute,
+  useLocation,
+  useParams,
+} from "@tanstack/react-router";
 import { useEffect } from "react";
 import { useHostedAuthRouteGuard } from "@/client/features/auth/useHostedAuthRouteGuard";
 import { prefetchBillingAccount } from "@/client/features/billing/billingAccountQuery";
@@ -9,6 +14,11 @@ import { PageLoading } from "@/client/components/Spinner";
 import { getLastProjectId } from "@/client/lib/active-project";
 import { AuthenticatedAppLayout } from "@/client/layout/AppShell";
 import { useOnboardingRedirect } from "@/client/features/onboarding/useOnboardingRedirect";
+import { PilotUnavailableNotice } from "@/client/features/research-pilot/ResearchPilotPages";
+import {
+  isPilotHiddenPath,
+  useResearchPilot,
+} from "@/client/lib/research-pilot";
 
 export const Route = createFileRoute("/_app")({
   component: AppRouteLayout,
@@ -21,6 +31,9 @@ function AppRouteLayout() {
   const authGate = useHostedAuthRouteGuard();
   const isOnboarded = useOnboardingRedirect();
   const { projectId } = useParams({ strict: false });
+  const { pathname } = useLocation();
+  // A page the research pilot does not serve, reached by URL or an old link.
+  const pilotHidden = useResearchPilot() && isPilotHiddenPath(pathname);
   // The shell paints at once, and only the page waits for the session check,
   // so a full load shows the sidebar and a page skeleton instead of a spinner.
   const ready = authGate.canRenderAuthenticatedContent;
@@ -51,7 +64,13 @@ function AppRouteLayout() {
         ) : undefined
       }
     >
-      {ready ? <Outlet /> : <SkeletonPage />}
+      {!ready ? (
+        <SkeletonPage />
+      ) : pilotHidden ? (
+        <PilotUnavailableNotice />
+      ) : (
+        <Outlet />
+      )}
     </AuthenticatedAppLayout>
   );
 }

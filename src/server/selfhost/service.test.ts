@@ -1,5 +1,9 @@
 import { beforeEach, expect, it, vi } from "vitest";
-import { spendSelfHosted, authorizePilotTool } from "./service";
+import {
+  assertPilotDomainUnchanged,
+  spendSelfHosted,
+  authorizePilotTool,
+} from "./service";
 import { DataforseoChargedTaskError } from "@/server/lib/dataforseo/envelope";
 
 const mocks = vi.hoisted(() => ({
@@ -41,7 +45,10 @@ it("does not call a provider when the durable reservation is refused", async () 
   const provider = vi.fn();
   await expect(
     spendSelfHosted(customer, provider, 0.01, "keywords.overview"),
-  ).rejects.toThrow("budget exceeded");
+  ).rejects.toMatchObject({
+    code: "RESEARCH_UNAVAILABLE",
+    message: "budget exceeded",
+  });
   expect(provider).not.toHaveBeenCalled();
 });
 it("reserves raw USD before dispatch and settles the real provider cost", async () => {
@@ -102,7 +109,7 @@ it("does not return successful data when durable settlement fails", async () => 
 it("refuses an unsupported operation and an unavailable project before reserving", async () => {
   const provider = vi.fn();
   await expect(spendSelfHosted(customer, provider, 0.01)).rejects.toMatchObject(
-    { code: "FORBIDDEN" },
+    { code: "RESEARCH_UNAVAILABLE" },
   );
   mocks.project.mockResolvedValue(null);
   await expect(
@@ -128,7 +135,10 @@ it("checks mapped identity for cached or saved project data before the handler r
   mocks.authorizeProject.mockRejectedValue(new Error("mapping changed"));
   await expect(
     authorizePilotTool("get_report", { projectId: "project" }, toolContext),
-  ).rejects.toThrow("mapping changed");
+  ).rejects.toMatchObject({
+    code: "PROJECT_NOT_LINKED",
+    message: "mapping changed",
+  });
   expect(mocks.authorizeProject).toHaveBeenCalledWith(
     "org",
     "project",
@@ -152,4 +162,13 @@ it("blocks unsupported tools and name-based Maps targets before mapping or provi
       ),
     ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
   expect(mocks.authorizeProject).not.toHaveBeenCalled();
+});
+it("refuses a domain change on a linked project but accepts the same domain written differently", async () => {
+  await expect(
+    assertPilotDomainUnchanged("example.com", "https://www.example.com"),
+  ).resolves.toBeUndefined();
+  for (const next of ["other.com", undefined])
+    await expect(
+      assertPilotDomainUnchanged("example.com", next),
+    ).rejects.toMatchObject({ code: "RESEARCH_UNAVAILABLE" });
 });

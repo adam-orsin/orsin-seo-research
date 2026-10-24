@@ -8,6 +8,7 @@ const {
   listSections,
   listCompetitors,
   listKeywords,
+  isHosted,
 } = vi.hoisted(() => ({
   generateText: vi.fn(),
   readSite: vi.fn(),
@@ -15,6 +16,7 @@ const {
   listSections: vi.fn(),
   listCompetitors: vi.fn(),
   listKeywords: vi.fn(),
+  isHosted: vi.fn(),
 }));
 vi.mock("ai", async (importOriginal) => ({
   NoObjectGeneratedError: (await importOriginal<typeof Ai>())
@@ -29,6 +31,7 @@ vi.mock("@/server/lib/dataforseo/serp", () => ({ fetchLiveSerp: search }));
 vi.mock("@/server/lib/runtime-env", () => ({
   getRequiredEnvValue: vi.fn(),
   getOptionalEnvValue: vi.fn(),
+  isHostedServerAuthMode: isHosted,
 }));
 vi.mock("@/server/lib/openrouter", () => ({ buildChatAgentModel: vi.fn() }));
 vi.mock("@/server/lib/chatAgent", () => ({
@@ -86,6 +89,7 @@ type ResearchTools = {
 };
 
 beforeEach(() => {
+  isHosted.mockResolvedValue(true);
   listSections.mockResolvedValue([
     { key: "business_overview", content: overview },
   ]);
@@ -149,6 +153,18 @@ describe("researchWebsite", () => {
     });
     expect(generateText).not.toHaveBeenCalled();
     expect(readSite).not.toHaveBeenCalled();
+    expect(search).not.toHaveBeenCalled();
+  });
+
+  it("refuses in the self-host pilot before reading sites, calling the model, or searching", async () => {
+    isHosted.mockResolvedValue(false);
+    listCompetitors.mockResolvedValue([]);
+
+    await expect(
+      researchWebsite("https://saved.com", project, customer),
+    ).rejects.toMatchObject({ code: "RESEARCH_UNAVAILABLE" });
+    expect(readSite).not.toHaveBeenCalled();
+    expect(generateText).not.toHaveBeenCalled();
     expect(search).not.toHaveBeenCalled();
   });
 

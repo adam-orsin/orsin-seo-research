@@ -289,7 +289,9 @@ function ResearchErrorCard({
         <ErrorState
           message={message}
           onRetry={
-            errorCode === "UNKNOWN_LOCATION"
+            // A pilot refusal is a setting, so retrying cannot help.
+            errorCode === "UNKNOWN_LOCATION" ||
+            errorCode === "RESEARCH_UNAVAILABLE"
               ? undefined
               : controller.retrySearch
           }

@@ -21,6 +21,8 @@ const ERROR_CODES = [
   "RATE_LIMITED",
   "UPSTREAM_UNAVAILABLE",
   "CONFLICT",
+  "RESEARCH_UNAVAILABLE",
+  "PROJECT_NOT_LINKED",
   "INTERNAL_ERROR",
 ] as const;
 
@@ -48,6 +50,11 @@ const NON_REPORTABLE_ERROR_CODES = new Set<ErrorCode>([
   // log what they capture, so every throw site warns on its own line to keep
   // the failure rate visible in Workers Observability.
   "UPSTREAM_UNAVAILABLE",
+  // Self-host research pilot refusals: a feature or paid operation that is
+  // turned off, a spending limit reached, or a project with no client mapping.
+  // Expected policy outcomes, not faults.
+  "RESEARCH_UNAVAILABLE",
+  "PROJECT_NOT_LINKED",
 ]);
 
 export function isErrorCode(value: string): value is ErrorCode {

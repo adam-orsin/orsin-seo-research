@@ -12,6 +12,7 @@ import { BILLING_ROUTE } from "@/shared/billing";
 import { getSeoApiKeyStatus } from "@/serverFunctions/config";
 import { getLastProjectId } from "@/client/lib/active-project";
 import { dataforseoHelpLinkOptions } from "@/client/navigation/items";
+import { useResearchPilot } from "@/client/lib/research-pilot";
 import {
   SidebarInset,
   SidebarProvider,
@@ -31,6 +32,7 @@ export function AuthenticatedAppLayout({
   banner?: React.ReactNode;
 }) {
   const location = useLocation();
+  const researchPilot = useResearchPilot();
   const [showMissingSeoApiKeyModal, setShowMissingSeoApiKeyModal] =
     React.useState(false);
   // On non-project pages (e.g. /settings) there's no projectId in the URL, so
@@ -127,7 +129,7 @@ export function AuthenticatedAppLayout({
         />
       ) : null}
 
-      {ready ? (
+      {ready && !researchPilot ? (
         <GscReEngagementModal
           projectId={sidebarProjectId}
           suppressed={showMissingSeoApiKeyModal}

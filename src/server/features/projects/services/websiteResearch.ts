@@ -20,6 +20,7 @@ import { buildChatAgentModel } from "@/server/lib/openrouter";
 import {
   getOptionalEnvValue,
   getRequiredEnvValue,
+  isHostedServerAuthMode,
 } from "@/server/lib/runtime-env";
 import { readSite } from "@/server/lib/scrape";
 import {
@@ -107,6 +108,14 @@ export async function researchWebsite(
   };
   if (!missingOverview && !missingCompetitors && !missingTopics)
     return websiteResearchSchema.parse(preserved);
+  // The rest reads websites, calls the model, and runs live Google searches
+  // outside the self-host spending ledger, so the research pilot refuses it
+  // before any fetch.
+  if (!(await isHostedServerAuthMode()))
+    throw new AppError(
+      "RESEARCH_UNAVAILABLE",
+      "Website research is turned off in the self-host research pilot.",
+    );
   // Each field is independent: saved context supplies the evidence, and the
   // model only receives output fields and tools for the missing information.
   const spend: ResearchSpend[] = [];

@@ -1,4 +1,8 @@
 import { NavTab, NavTabs } from "@/client/components/NavTabs";
+import {
+  isPilotHiddenPath,
+  useResearchPilot,
+} from "@/client/lib/research-pilot";
 
 const tabs = [
   { to: "/p/$projectId/settings" as const, label: "General", exact: true },
@@ -6,9 +10,13 @@ const tabs = [
 ];
 
 export function SettingsTabs({ projectId }: { projectId: string }) {
+  const researchPilot = useResearchPilot();
+  const visibleTabs = researchPilot
+    ? tabs.filter((tab) => !isPilotHiddenPath(tab.to))
+    : tabs;
   return (
     <NavTabs label="Project settings sections">
-      {tabs.map((tab) => (
+      {visibleTabs.map((tab) => (
         <NavTab
           key={tab.to}
           to={tab.to}

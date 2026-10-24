@@ -7,6 +7,7 @@ import {
   directorySchema,
   usdToMicros,
   pilotPathAllowed,
+  pilotServerFunctionAllowed,
 } from "./policy";
 
 let db: DatabaseSync;
@@ -318,16 +319,40 @@ describe("self-host spending and client routing", () => {
         ],
       }),
     ).toThrow();
-    expect(pilotPathAllowed("/mcp")).toBe(true);
-    expect(pilotPathAllowed("/api/orsin/maintenance")).toBe(true);
-    expect(pilotPathAllowed("/ops")).toBe(true);
+  });
+  it("serves the browser app but keeps raw routes outside it closed", () => {
     for (const path of [
-      "/_server/action",
-      "/api/ai-visibility/download",
-      "/agents/sam",
-      "/mcp/../api",
+      "/mcp",
+      "/api/health",
+      "/api/orsin/maintenance",
+      "/ops",
       "/",
+      "/p/project/keywords",
+      "/_serverFn/abc",
+      "/assets/index.js",
+      "/r/report",
+    ])
+      expect(pilotPathAllowed(path)).toBe(true);
+    for (const path of [
+      "/api/ai-visibility/download",
+      "/api/auth/get-session",
+      "/api/gsc/oauth/callback",
+      "/api/autumn/webhook",
+      "/agents/sam-chat/session",
+      "/s/token",
+      "/s/token/raw",
+      "/mcp/extra",
     ])
       expect(pilotPathAllowed(path)).toBe(false);
+  });
+  it("allows only listed browser server functions", () => {
+    const fn = (filename: string, name: string) =>
+      pilotServerFunctionAllowed({ filename, name });
+    expect(fn("src/serverFunctions/keywords.ts", "getSerpAnalysis")).toBe(true);
+    expect(fn("/repo/src/serverFunctions/reports.ts", "getReport")).toBe(true);
+    expect(fn("src/serverFunctions/reports.ts", "shareReport")).toBe(false);
+    expect(fn("src/serverFunctions/audit.ts", "startAudit")).toBe(false);
+    expect(fn("src/serverFunctions/sam.ts", "createSamSession")).toBe(false);
+    expect(fn("src/elsewhere/keywords.ts", "getSerpAnalysis")).toBe(false);
   });
 });

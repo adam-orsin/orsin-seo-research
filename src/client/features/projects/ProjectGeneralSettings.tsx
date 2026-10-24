@@ -15,6 +15,7 @@ import {
 } from "@/client/lib/active-project";
 import { toastInitialAudit } from "@/client/features/projects/initialAuditToast";
 import { archiveProject, updateProject } from "@/serverFunctions/projects";
+import { useResearchPilot } from "@/client/lib/research-pilot";
 import type { ProjectSummary } from "./types";
 
 export function ProjectGeneralSettings({ projectId }: { projectId: string }) {
@@ -50,6 +51,7 @@ const generalSchema = z.object({
 
 function GeneralSection({ project }: { project: ProjectSummary }) {
   const queryClient = useQueryClient();
+  const researchPilot = useResearchPilot();
 
   const updateMutation = useMutation({
     mutationFn: (values: z.infer<typeof generalSchema>) =>
@@ -107,23 +109,34 @@ function GeneralSection({ project }: { project: ProjectSummary }) {
             )}
           </form.AppField>
 
-          <p className="text-sm text-muted-foreground">
-            Adding your website starts a 50-page scan with JavaScript rendering.
-            Rendering uses your credits.
-          </p>
+          {researchPilot ? null : (
+            <p className="text-sm text-muted-foreground">
+              Adding your website starts a 50-page scan with JavaScript
+              rendering. Rendering uses your credits.
+            </p>
+          )}
           <form.AppField name="domain">
             {(field) => (
               <field.TextField
                 label={
                   <>
                     Domain{" "}
-                    <span className="font-normal text-muted-foreground">
-                      (optional)
-                    </span>
+                    {researchPilot ? null : (
+                      <span className="font-normal text-muted-foreground">
+                        (optional)
+                      </span>
+                    )}
                   </>
                 }
                 placeholder="example.com"
                 maxLength={255}
+                // The client link binds this domain in the research pilot.
+                readOnly={researchPilot}
+                description={
+                  researchPilot
+                    ? "This project is linked to a client by its domain, so the domain can't change here."
+                    : undefined
+                }
               />
             )}
           </form.AppField>

@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { linkOptions } from "@tanstack/react-router";
 import { GoogleGlyphMuted } from "@/client/features/gsc/GoogleGlyph";
+import { isPilotHiddenPath } from "@/client/lib/research-pilot";
 
 const projectNavItems = [
   {
@@ -110,6 +111,19 @@ function getProjectNavItems(projectId: string) {
       search: {},
     })),
   );
+}
+
+// The research pilot drops the pages it does not serve, and any group left
+// empty.
+export function getPilotNavGroups<
+  T extends { label: string; items: ReadonlyArray<{ to: string }> },
+>(groups: T[]): T[] {
+  return groups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => !isPilotHiddenPath(item.to)),
+    }))
+    .filter((group) => group.items.length > 0);
 }
 
 // Grouped by scope: "My Site" is the project's own domain (tracked data),

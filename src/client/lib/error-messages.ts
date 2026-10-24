@@ -43,6 +43,10 @@ const STANDARD_MESSAGES: Record<ErrorCode, string> = {
   UPSTREAM_UNAVAILABLE:
     "The data provider is temporarily unavailable. Please retry in a moment.",
   CONFLICT: "This request conflicts with existing data.",
+  RESEARCH_UNAVAILABLE:
+    "This research isn't available here. It's either turned off for this workspace or the spending limit has been reached.",
+  PROJECT_NOT_LINKED:
+    "This project isn't linked to a client yet, so it can't be used here. Link it to a client through the research connection first.",
   INTERNAL_ERROR: UNEXPECTED_ERROR_MESSAGE,
 };
 

@@ -5,6 +5,7 @@ import { resolveUserContextFromHeaders } from "@/middleware/ensure-user/resolve"
 import { ProjectRepository } from "@/server/features/projects/repositories/ProjectRepository";
 import { ReportRepository } from "@/server/features/reports/repositories/ReportRepository";
 import { asAppError } from "@/server/lib/errors";
+import { authorizeMappedProject } from "@/server/selfhost/service";
 import { reportDocumentResponse, textResponse } from "@/shared/report-sandbox";
 
 // The report viewer: the stored document, served byte for byte from the app's
@@ -72,6 +73,20 @@ async function handleReportRequest(
       `This project is archived, so its reports are hidden. Restore ${archived.name} to read them.`,
       404,
     );
+  }
+
+  // The self-host research pilot reads reports only for a project that is
+  // still linked to its client, as the MCP report tools do.
+  if (!isHostedAuthMode(env.AUTH_MODE)) {
+    try {
+      await authorizeMappedProject(context.organizationId, project);
+    } catch (error) {
+      if (asAppError(error)?.code !== "PROJECT_NOT_LINKED") throw error;
+      return textResponse(
+        "This project isn't linked to a client, so its reports are hidden.",
+        403,
+      );
+    }
   }
 
   const html = await ReportRepository.getReportHtml(projectId, reportId);

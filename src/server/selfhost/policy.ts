@@ -149,13 +149,71 @@ export const maintenanceRequestSchema = z.discriminatedUnion("action", [
 // Read-only operator page: spend, holds, and recent interventions.
 export const ORSIN_OPS_PATH = "/ops";
 
-// Cloudflare Access handles login before the worker. The pilot has no browser
-// app, in-app agent, server-function API, crawler, or public report surface.
+// Raw routes outside the browser app stay closed: the in-app agent, public
+// report snapshots, the AI-visibility download, OAuth callbacks, billing
+// webhooks, and every other /api route.
+const CLOSED_PATH_PREFIXES = ["/agents", "/s/", "/api/", "/.well-known/"];
+
+// Cloudflare Access handles login before the worker. Besides MCP and the
+// operator routes, the pilot serves the browser app: its documents, assets,
+// the signed-in report viewer (/r/...), and server functions, which
+// pilotServerFunctionAllowed narrows further.
 export function pilotPathAllowed(path: string) {
-  return (
+  if (
     path === "/mcp" ||
     path === "/api/health" ||
     path === ORSIN_MAINTENANCE_PATH ||
     path === ORSIN_OPS_PATH
+  )
+    return true;
+  return (
+    !path.startsWith("/mcp/") &&
+    !CLOSED_PATH_PREFIXES.some((prefix) => path.startsWith(prefix))
   );
+}
+
+// Browser server functions the pilot serves, by file under src/serverFunctions.
+// Anything missing (site audits, rank tracking, AI visibility, backlinks,
+// domain overview, Google connections, billing, the in-app agent, report
+// sharing, website setup research, onboarding, teams) refuses before it runs. Paid research inside an
+// allowed function still goes through the ledger.
+const PILOT_SERVER_FUNCTIONS: Record<string, ReadonlySet<string>> = {
+  "config.ts": new Set(["getSeoApiKeyStatus", "getResearchPilotStatus"]),
+  "keywords.ts": new Set([
+    "researchKeywords",
+    "saveKeywords",
+    "getSavedKeywords",
+    "exportSavedKeywords",
+    "updateSavedKeywordTags",
+    "updateSavedKeywordTag",
+    "deleteSavedKeywordTag",
+    "removeSavedKeywords",
+    "refreshSavedKeywordMetrics",
+    "getSerpAnalysis",
+  ]),
+  "projectContext.ts": new Set(["getProjectContext", "updateProjectContext"]),
+  "projects.ts": new Set([
+    "getProjects",
+    "createProject",
+    "updateProject",
+    "archiveProject",
+    "getArchivedProjects",
+    "restoreProject",
+    "getProjectAccess",
+  ]),
+  "reportTemplates.ts": new Set([
+    "listReportTemplates",
+    "saveReportTemplate",
+    "deleteReportTemplate",
+  ]),
+  "reports.ts": new Set(["listReports", "getReport", "deleteReport"]),
+  "serp-locations.ts": new Set(["searchSerpLocations", "prewarmSerpLocations"]),
+};
+
+export function pilotServerFunctionAllowed(meta: {
+  filename: string;
+  name: string;
+}) {
+  const match = /(?:^|\/)src\/serverFunctions\/([^/]+)$/.exec(meta.filename);
+  return Boolean(match && PILOT_SERVER_FUNCTIONS[match[1]]?.has(meta.name));
 }

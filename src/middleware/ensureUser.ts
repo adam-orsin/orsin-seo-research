@@ -4,6 +4,8 @@ import { resolveUserContextFromHeaders } from "@/middleware/ensure-user/resolve"
 import type { EnsuredProject } from "@/middleware/ensure-user/types";
 import { AppError } from "@/server/lib/errors";
 import { ProjectRepository } from "@/server/features/projects/repositories/ProjectRepository";
+import { isHostedServerAuthMode } from "@/server/lib/runtime-env";
+import { authorizeMappedProject } from "@/server/selfhost/service";
 
 function extractProjectId(data: unknown) {
   if (!data || typeof data !== "object" || !("projectId" in data)) {
@@ -36,6 +38,13 @@ export const ensureUserMiddleware = createMiddleware({
 
     if (!project) {
       throw new AppError("NOT_FOUND");
+    }
+
+    // The self-host research pilot also requires the project's client
+    // mapping, as MCP tools do, so a project whose mapping was removed or
+    // whose domain changed can neither read nor research.
+    if (!(await isHostedServerAuthMode())) {
+      await authorizeMappedProject(context.organizationId, project);
     }
   }
 

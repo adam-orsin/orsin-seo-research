@@ -150,7 +150,7 @@ function handleFetch(
   const pathname = new URL(publicRequest.url).pathname;
   if (!isHostedAuthMode(authMode) && !pilotPathAllowed(pathname)) {
     return new Response(
-      "The self-host pilot exposes only MCP and health. Browser features are disabled.",
+      "This route is turned off in the self-host research pilot.",
       { status: 403 },
     );
   }

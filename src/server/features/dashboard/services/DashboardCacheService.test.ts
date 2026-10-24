@@ -21,6 +21,7 @@ const state = await vi.hoisted(async () => {
     cache: new Map<string, unknown>(),
     startAudit: vi.fn(),
     latestAudit: vi.fn(),
+    env: { DATABASE_PROVIDER: "d1", AUTH_MODE: "hosted" },
   };
 });
 vi.mock("@/server/features/audit/services/AuditService", () => ({
@@ -33,7 +34,7 @@ vi.mock("@/server/features/audit/repositories/AuditRepository", () => ({
   AuditRepository: { getLatestAuditForProject: state.latestAudit },
 }));
 vi.mock("@/db", () => ({ db: state.db }));
-vi.mock("cloudflare:workers", () => ({ env: { DATABASE_PROVIDER: "d1" } }));
+vi.mock("cloudflare:workers", () => ({ env: state.env }));
 vi.mock("@/server/lib/r2-cache", async (importOriginal) => ({
   ...(await importOriginal<typeof R2Cache>()),
   getCached: async (key: string) => state.cache.get(key) ?? null,
@@ -43,6 +44,7 @@ vi.mock("@/server/lib/r2-cache", async (importOriginal) => ({
 }));
 
 beforeEach(async () => {
+  state.env.AUTH_MODE = "hosted";
   state.cache.clear();
   state.latestAudit.mockResolvedValue(null);
   state.startAudit.mockResolvedValue({ auditId: "audit" });
@@ -187,4 +189,11 @@ it("returns a visible startup refusal and backs off instead of repeatedly attemp
   ).toMatchObject({ status: "unavailable", code: "INSUFFICIENT_CREDITS" });
   await DashboardFirstAuditService.start("project", "example.com", customer);
   expect(state.startAudit).toHaveBeenCalledTimes(1);
+});
+it("starts no audit when a website is saved in the self-host research pilot", async () => {
+  state.env.AUTH_MODE = "local_noauth";
+  expect(
+    await DashboardFirstAuditService.start("project", "example.com", customer),
+  ).toBeNull();
+  expect(state.startAudit).not.toHaveBeenCalled();
 });

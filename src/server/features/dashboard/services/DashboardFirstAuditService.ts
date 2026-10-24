@@ -6,6 +6,7 @@ import { DataRefreshClaimRepository } from "../repositories/DataRefreshClaimRepo
 import { buildCacheKey } from "@/server/lib/r2-cache";
 import { asAppError } from "@/server/lib/errors";
 import { captureServerEvent } from "@/server/lib/posthog";
+import { isHostedServerAuthMode } from "@/server/lib/runtime-env";
 import type { BillingCustomerContext } from "@/server/billing/subscription";
 
 async function start(
@@ -16,6 +17,9 @@ async function start(
   let key: string | null = null;
   let token: string | null = null;
   let auditStarted = false;
+  // The self-host research pilot runs no site audits; saving a website there
+  // only records the domain.
+  if (!(await isHostedServerAuthMode())) return null;
   try {
     if (!domain || (await AuditRepository.getLatestAuditForProject(projectId)))
       return null;
