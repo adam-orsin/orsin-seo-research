@@ -146,10 +146,16 @@ export const maintenanceRequestSchema = z.discriminatedUnion("action", [
     .strict(),
 ]);
 
+// Read-only operator page: spend, holds, and recent interventions.
+export const ORSIN_OPS_PATH = "/ops";
+
 // Cloudflare Access handles login before the worker. The pilot has no browser
 // app, in-app agent, server-function API, crawler, or public report surface.
 export function pilotPathAllowed(path: string) {
   return (
-    path === "/mcp" || path === "/api/health" || path === ORSIN_MAINTENANCE_PATH
+    path === "/mcp" ||
+    path === "/api/health" ||
+    path === ORSIN_MAINTENANCE_PATH ||
+    path === ORSIN_OPS_PATH
   );
 }

@@ -12,7 +12,7 @@ const MAX_BODY_BYTES = 16 * 1024;
 // Who is asking, for the ledger_events audit row. Cloudflare Access puts a
 // login's email or a service token's common_name in the verified JWT; the
 // local mode has one implicit admin.
-async function resolveOperator(
+export async function resolveOperator(
   request: Request,
   authMode: "cloudflare_access" | "local_noauth",
 ): Promise<string | null> {

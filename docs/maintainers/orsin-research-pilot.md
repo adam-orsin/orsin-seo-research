@@ -4,9 +4,11 @@ This fork provides a separate MCP research service. Deployment is not approved. 
 
 ## First increment
 
-Self-host mode exposes `/mcp`, `/api/health`, and the operator-only `/api/orsin/maintenance`. Browser pages, server functions, in-app agents, public reports, site audits, and scheduled execution are blocked. MCP tools outside the pilot allowlist refuse invocation. Hosted upstream behavior keeps its existing billing path.
+Self-host mode exposes `/mcp`, `/api/health`, the operator-only `/api/orsin/maintenance`, and the read-only `/ops` page. Browser pages, server functions, in-app agents, public reports, site audits, and scheduled execution are blocked. MCP tools outside the pilot allowlist refuse invocation. Hosted upstream behavior keeps its existing billing path.
 
 The pilot supports four paid provider operations: `keywords.overview`, `serp.organic`, `maps.grid`, and `business.profile`. Each operation is disabled until it appears in `ORSIN_ENABLED_OPERATIONS`. Keyword metrics that require the Google Ads fallback are unavailable in this increment. Maps targets require an exact `cid` or `placeId`; omit the name fallback.
+
+`GET /ops` is a read-only operator page behind Cloudflare Access. The worker verifies the Access JWT the same way the maintenance route does and returns 401 without it; hosted mode never serves it. The page shows monthly and daily spend against their limits, held funds, and the pause state; spend by client and operation for the current UTC month; daily spend for the last 30 days; unsettled holds with their age; and the last 50 operator interventions. It renders server-side with no client script, shows dollars to four decimals, and sets `Cache-Control: no-store`. It changes nothing; recovery still goes through the maintenance route.
 
 Four MCP tools manage discovery and review: `bind_client_project`, `resolve_client_project`, `get_spending_status`, and `estimate_research_cost`. The estimate previews provider cost using the dispatch estimators. It neither reserves money nor overrides policy. Retain the same parameters in the actual research call.
 

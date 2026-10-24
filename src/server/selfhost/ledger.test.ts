@@ -200,6 +200,74 @@ describe("self-host spending and client routing", () => {
       },
     ]);
   });
+  it("summarizes spend by UTC day and by client for the current month, with open holds", () => {
+    ledger.bind({
+      organizationId: "org",
+      projectId: "other-project",
+      clientRef: "other-client",
+      domain: "other.example.com",
+    });
+    const spend = (
+      at: string,
+      actual: number | null,
+      overrides: Partial<ReturnType<typeof reservation>> = {},
+    ) => {
+      vi.setSystemTime(new Date(at));
+      const { id } = ledger.reserve({ ...reservation(10_000), ...overrides });
+      if (actual !== null) ledger.settle({ id, actual });
+      return id;
+    };
+    spend("2026-09-21T12:00:00Z", 1_000); // 31 days back: outside the window
+    spend("2026-09-30T23:59:00Z", 2_000); // inside the window, last month
+    spend("2026-10-20T08:00:00Z", 3_000, { operation: "serp.organic" });
+    spend("2026-10-21T09:00:00Z", 4_000, { operation: "serp.organic" });
+    const released = spend("2026-10-21T10:00:00Z", null);
+    ledger.release(released, "No charge on the provider dashboard", "ops");
+    const held = spend("2026-10-21T11:00:00Z", null, {
+      projectId: "other-project",
+      domain: "other.example.com",
+    });
+    vi.setSystemTime(new Date("2026-10-21T12:00:00Z"));
+
+    const summary = ledger.summary();
+    expect(summary.days).toHaveLength(30);
+    expect(summary.days[0].day).toBe("2026-09-22");
+    expect(summary.days.filter((day) => day.calls > 0)).toEqual([
+      { day: "2026-09-30", calls: 1, spent: 2_000 },
+      { day: "2026-10-20", calls: 1, spent: 3_000 },
+      { day: "2026-10-21", calls: 3, spent: 4_000 },
+    ]);
+    expect(summary.byClient).toEqual([
+      {
+        clientRef: "demo-client",
+        operation: "serp.organic",
+        calls: 2,
+        spent: 7_000,
+        held: 0,
+      },
+      {
+        clientRef: "demo-client",
+        operation: "keywords.overview",
+        calls: 1,
+        spent: 0,
+        held: 0,
+      },
+      {
+        clientRef: "other-client",
+        operation: "keywords.overview",
+        calls: 1,
+        spent: 0,
+        held: 10_000,
+      },
+    ]);
+    expect(summary.holds).toMatchObject([
+      { id: held, clientRef: "other-client" },
+    ]);
+    expect(summary.events).toMatchObject([
+      { kind: "release", reservationId: released, actor: "ops" },
+    ]);
+    expect(summary.status).toMatchObject({ monthlySpent: 7_000, held: 10_000 });
+  });
   it("matches exact client references, domains, and organization scope", () => {
     expect(ledger.bind(mapping)).toMatchObject({ domain: "example.com" });
     expect(ledger.resolve("org", "demo-client").projectId).toBe("project");
@@ -252,6 +320,7 @@ describe("self-host spending and client routing", () => {
     ).toThrow();
     expect(pilotPathAllowed("/mcp")).toBe(true);
     expect(pilotPathAllowed("/api/orsin/maintenance")).toBe(true);
+    expect(pilotPathAllowed("/ops")).toBe(true);
     for (const path of [
       "/_server/action",
       "/api/ai-visibility/download",

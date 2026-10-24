@@ -44,4 +44,8 @@ export class SelfHostControl extends DurableObject<Env> {
   unpause(reason: string, actor: string) {
     return this.ledger.unpause(reason, actor);
   }
+  // Read-only operator page at /ops; also never reached by an MCP tool.
+  summary() {
+    return this.ledger.summary();
+  }
 }

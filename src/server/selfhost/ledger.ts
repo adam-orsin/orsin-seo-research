@@ -293,6 +293,70 @@ export class ResearchLedger {
     };
   }
 
+  // Read-only view for the operator page: everything in one call so the page
+  // renders from a single consistent snapshot of the ledger.
+  summary() {
+    const now = new Date();
+    const today = now.toISOString().slice(0, 10);
+    const dayKeys = Array.from({ length: 30 }, (_, index) =>
+      new Date(now.getTime() - (29 - index) * 86_400_000)
+        .toISOString()
+        .slice(0, 10),
+    );
+    const dailyRows = new Map(
+      this.store
+        .query(
+          `SELECT day, COUNT(*) AS calls, COALESCE(SUM(actual),0) AS spent
+          FROM spend_reservations WHERE day >= ? AND day <= ? GROUP BY day`,
+          dayKeys[0],
+          today,
+        )
+        .map((row) => [String(row.day), row]),
+    );
+    const byClient = this.store
+      .query(
+        `SELECT client_ref, operation, COUNT(*) AS calls,
+        COALESCE(SUM(actual),0) AS spent,
+        COALESCE(SUM(CASE WHEN actual IS NULL THEN estimated ELSE 0 END),0) AS held
+        FROM spend_reservations WHERE month = ?
+        GROUP BY client_ref, operation ORDER BY spent DESC, client_ref, operation`,
+        today.slice(0, 7),
+      )
+      .map((row) => ({
+        clientRef: String(row.client_ref),
+        operation: String(row.operation),
+        calls: Number(row.calls),
+        spent: Number(row.spent),
+        held: Number(row.held),
+      }));
+    const events = this.store
+      .query(
+        `SELECT id, kind, reservation_id, actor, reason, created_at
+        FROM ledger_events ORDER BY id DESC LIMIT 50`,
+      )
+      .map((row) => ({
+        id: Number(row.id),
+        kind: String(row.kind),
+        reservationId:
+          typeof row.reservation_id === "string" ? row.reservation_id : null,
+        actor: String(row.actor),
+        reason: String(row.reason),
+        createdAt: String(row.created_at),
+      }));
+    return {
+      asOf: now.toISOString(),
+      status: this.status(),
+      days: dayKeys.map((day) => ({
+        day,
+        calls: Number(dailyRows.get(day)?.calls ?? 0),
+        spent: Number(dailyRows.get(day)?.spent ?? 0),
+      })),
+      byClient,
+      holds: this.listUnsettled(),
+      events,
+    };
+  }
+
   private recordEvent(
     kind: "release" | "unpause",
     reservationId: string | null,

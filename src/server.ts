@@ -1,5 +1,6 @@
 import {
   ORSIN_MAINTENANCE_PATH,
+  ORSIN_OPS_PATH,
   pilotPathAllowed,
 } from "./server/selfhost/policy";
 import {
@@ -198,6 +199,13 @@ function handleFetch(
     return import("@/server/selfhost/maintenance").then(
       ({ handleOrsinMaintenanceRequest }) =>
         handleOrsinMaintenanceRequest(publicRequest, authMode, env),
+    );
+  }
+
+  // Read-only operator page for the same ledger; also non-hosted only.
+  if (pathname === ORSIN_OPS_PATH) {
+    return import("@/server/selfhost/ops").then(({ handleOrsinOpsRequest }) =>
+      handleOrsinOpsRequest(publicRequest, authMode, env),
     );
   }
 
