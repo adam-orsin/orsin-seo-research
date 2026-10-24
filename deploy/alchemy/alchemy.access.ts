@@ -77,5 +77,9 @@ export const emailAccessGate = (options: {
       name: options.applicationName,
       domain: options.domain,
       policies: [allow.policyId],
+      // An MCP client carries the Access pass as a static header, so a
+      // 24-hour session would disconnect the agent daily. One month is the
+      // longest Access allows.
+      sessionDuration: "720h",
     });
   });
