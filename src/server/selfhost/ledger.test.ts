@@ -18,7 +18,7 @@ const config = {
   ORSIN_DAILY_USD: "0.15",
   ORSIN_MONTHLY_USD: "0.2",
   ORSIN_ENABLED_OPERATIONS:
-    "keywords.overview,serp.organic,maps.grid,business.profile",
+    "keywords.overview,keywords.ideas,serp.organic,maps.grid,business.profile",
   ORSIN_CLIENT_DIRECTORY: JSON.stringify({
     schemaVersion: 1,
     clients: [

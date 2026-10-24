@@ -127,6 +127,13 @@ const estimateInput = z.discriminatedUnion("operation", [
     includeClickstreamData: z.boolean().default(false),
   }),
   z.object({
+    operation: z.literal("keywords.ideas"),
+    limit: z
+      .union([z.literal(150), z.literal(300), z.literal(500)])
+      .default(150),
+    includeClickstreamData: z.boolean().default(false),
+  }),
+  z.object({
     operation: z.literal("serp.organic"),
     keyword: z.string().min(1),
     depth: z.number().int().min(1).max(200).default(SERP_ANALYSIS_DEPTH),
@@ -171,26 +178,36 @@ export const estimateResearchCostTool = {
             locationCode: 2840,
             languageCode: "en",
           })
-        : r.operation === "serp.organic"
-          ? dataforseoPricing.serp.live({
-              keyword: r.keyword,
-              depth: r.depth,
+        : r.operation === "keywords.ideas"
+          ? dataforseoPricing.keywords.ideas({
+              keyword: "estimate",
               locationCode: 2840,
               languageCode: "en",
+              limit: r.limit,
+              includeClickstreamData: r.includeClickstreamData,
             })
-          : r.operation === "maps.grid"
-            ? dataforseoPricing.serp.localTaskPost({
-                locationCoordinates: Array<string>(r.gridSize ** 2).fill("0,0"),
-                keyword: "estimate",
-                languageCode: "en",
-                device: "mobile",
-                depth: 20,
-              })
-            : dataforseoPricing.business.myBusinessInfo({
-                keyword: "estimate",
+          : r.operation === "serp.organic"
+            ? dataforseoPricing.serp.live({
+                keyword: r.keyword,
+                depth: r.depth,
                 locationCode: 2840,
                 languageCode: "en",
-              });
+              })
+            : r.operation === "maps.grid"
+              ? dataforseoPricing.serp.localTaskPost({
+                  locationCoordinates: Array<string>(r.gridSize ** 2).fill(
+                    "0,0",
+                  ),
+                  keyword: "estimate",
+                  languageCode: "en",
+                  device: "mobile",
+                  depth: 20,
+                })
+              : dataforseoPricing.business.myBusinessInfo({
+                  keyword: "estimate",
+                  locationCode: 2840,
+                  languageCode: "en",
+                });
     const budget = await selfHostControl().status();
     return mcpResponse({
       text: `Estimated provider cost: $${usd.toFixed(6)}. This preview does not start research or reserve funds.`,

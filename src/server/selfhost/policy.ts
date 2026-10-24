@@ -2,6 +2,9 @@ import { z } from "zod";
 
 export const operationSchema = z.enum([
   "keywords.overview",
+  // Labs keyword ideas, suggestions, and related keywords: the browser's
+  // keyword search and the research_keywords tool.
+  "keywords.ideas",
   "serp.organic",
   "maps.grid",
   "business.profile",
@@ -110,6 +113,7 @@ export const PILOT_TOOLS = new Set([
   "create_project",
   "get_project_context",
   "get_keyword_metrics",
+  "research_keywords",
   "get_serp_results",
   "get_local_rank_grid",
   "get_business_profile",

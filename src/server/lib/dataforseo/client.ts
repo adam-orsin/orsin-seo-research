@@ -169,16 +169,22 @@ export function createDataforseoClient(customer: BillingCustomerContext) {
         customer,
         fetchRelatedKeywords,
         dataforseoPricing.keywords.related,
+        undefined,
+        "keywords.ideas",
       ),
       suggestions: meter(
         customer,
         fetchKeywordSuggestions,
         dataforseoPricing.keywords.suggestions,
+        undefined,
+        "keywords.ideas",
       ),
       ideas: meter(
         customer,
         fetchKeywordIdeas,
         dataforseoPricing.keywords.ideas,
+        undefined,
+        "keywords.ideas",
       ),
       // Google Ads endpoints for countries Labs doesn't support.
       adsIdeas: meter(
